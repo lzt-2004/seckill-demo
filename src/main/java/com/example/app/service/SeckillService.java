@@ -159,6 +159,13 @@ public class SeckillService {
         log.info("订单支付成功,orderId={}, username={}, productId={}", order.getId(), order.getUsername(), product.getId());
         order.setPayTime(LocalDateTime.now());
         product.setStock(product.getStock() - 1);
+        String buyKey = "seckill:users:" + product.getId();
+        Long remove=redisTemplate.opsForSet().remove(buyKey,order.getUsername());
+        if(remove!=null&&remove>0){
+            log.info("限购标记删除成功,buyKey={},username={}",buyKey,order.getUsername()); 
+        }else{
+            log.warn("限购标记删除失败,buyKey={},username={}",buyKey,order.getUsername());
+        }
         seckillProductRepository.save(product);
         seckillOrderRepository.save(order);
         log.info("订单支付成功数据已更新保存,orderId={},username={}, productId={}", order.getId(), order.getUsername(), product.getId());
