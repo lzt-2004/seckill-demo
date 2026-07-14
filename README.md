@@ -40,19 +40,28 @@ MySQL 中需要有库（与配置里库名一致，例如 user_demo）。
 mvn spring-boot:run
 
 接口文档
-...
 
-现在 **可以先不改**，直接学 Git。
+启动后浏览器打开（哪个能开用哪个，自己试过后可改成确定地址）：
+
+• http://localhost:8080/swagger-ui/index.html
+• 或 http://localhost:8080/swagger-ui.html
+
+建议调用顺序
+
+1. 注册
+2. 登录拿 Token
+3. 创建商品
+4. 预热库存到 Redis
+5. 秒杀
+6. 查订单 / 支付
+
+已知限制
+
+• 学习项目，并发与一致性仍有可改进点
+• JWT 密钥等可能仍在源码中，公开仓库前注意
+
+保存：`Ctrl+O` 回车，退出：`Ctrl+X`。
 
 ---
 
-# 阶段 B · 本地 Git：让文件夹「会记历史」
 
-## 先懂三步（固定，任何项目一样）
-
-```text
-git init     →  把本文件夹变成仓库（生成隐藏的 .git）
-git add      →  选定「哪些文件要记进下一笔」
-git commit   →  拍一版快照，写下说明
-
-还没连 GitHub；先只在 你电脑 上记一笔。
