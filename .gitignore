@@ -1,0 +1,29 @@
+# ===== 构建产物（固定类别：可再生成）=====
+target/
+*.class
+*.jar
+*.war
+
+# ===== 依赖目录 =====
+node_modules/
+
+# ===== IDE =====
+.idea/
+*.iml
+.vscode/
+
+# ===== 本地敏感配置（真密码只留本机）=====
+src/main/resources/application.yml
+src/main/resources/application-local.yml
+.env
+.env.*
+
+# ===== 系统垃圾 =====
+.DS_Store
+Thumbs.db
+*.log
+
+# ===== 求职材料（按你这个仓库需要，不想公开就忽略）=====
+*.docx
+求职规划.md 
+面试简历.md 
