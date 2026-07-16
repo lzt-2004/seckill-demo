@@ -22,3 +22,6 @@ src/main/resources/application-local.yml
 .DS_Store
 Thumbs.db
 *.log
+
+# ===== 个人AGENTS.md=====
+AGENTs.md
