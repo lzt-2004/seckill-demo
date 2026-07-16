@@ -22,8 +22,3 @@ src/main/resources/application-local.yml
 .DS_Store
 Thumbs.db
 *.log
-
-# ===== 求职材料（按你这个仓库需要，不想公开就忽略）=====
-*.docx
-求职规划.md 
-面试简历.md 
