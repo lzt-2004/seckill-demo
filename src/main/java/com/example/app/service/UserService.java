@@ -3,6 +3,7 @@ package com.example.app.service;
 import org.springframework.stereotype.Service;
 
 import com.example.app.model.User;
+import com.example.app.model.UserRole;
 import com.example.app.repository.JpaUserRepository;
 import com.example.app.exception.UserNotFoundException;
 import com.example.app.exception.UsernameAlreadyExistsException;
@@ -81,6 +82,16 @@ public class UserService {
         if (!passwordEncoder.matches(password, user.getPassword())) {
              throw new AuthenticationFailedException("密码错误");
         }
+        return user;
+    }
+    @Transactional
+    public User updateUserRole(String username) {
+        User user = repository.findByUsername(username);
+        if (user == null) {
+            throw new UserNotFoundException(username);
+        }
+        user.setUserRole(UserRole.MERCHANT);
+        repository.save(user);
         return user;
     }
 

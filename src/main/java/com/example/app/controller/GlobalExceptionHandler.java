@@ -19,7 +19,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<String>> handleException(Exception ex) {
         return ResponseEntity.internalServerError()
             .body(ApiResponse.fail(500,"服务器内部问题" + ex.getMessage()));
-}
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<String>> handleValidationException(MethodArgumentNotValidException ex) {
         String message = ex.getBindingResult().getFieldErrors().get(0).getDefaultMessage();

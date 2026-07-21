@@ -7,4 +7,5 @@ public class AuthenticationFailedException extends BusinessException {
     public AuthenticationFailedException(String message) {
         super(1003, message, HttpStatus.UNAUTHORIZED);
     }
+    
 }

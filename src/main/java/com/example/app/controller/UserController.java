@@ -47,7 +47,6 @@ public class UserController {
              return ResponseEntity.ok(ApiResponse.success("成功添加用户："+request.getUsername()));
         
     }
-
     @DeleteMapping("/{username}")
     public ResponseEntity<ApiResponse<String>> deleteUser(@PathVariable String username) {
         service.deleteUser(username);
@@ -60,6 +59,10 @@ public class UserController {
         service.updateUser(username, request.getOldPassword(), request.getUsername(), request.getPassword(), request.getAge());
         return ResponseEntity.ok(ApiResponse.success("成功将用户：" + username+"修改为"+request.getUsername()));
 
+    }
+    @PutMapping("/{username}/admin")
+    public ResponseEntity<ApiResponse<User>> putUserRole(@PathVariable String username){
+        return ResponseEntity.ok(ApiResponse.success(service.updateUserRole(username)));
     }
     
 }

@@ -11,6 +11,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.time.LocalDateTime;
@@ -63,6 +65,7 @@ public class SeckillService {
     );
         STOCK_SCRIPTTWO.setResultType(Long.class);
     }
+
     public  SeckillService(SeckillProductRepository seckillProductRepository,StringRedisTemplate redisTemplate,SeckillOrderRepository seckillOrderRepository )
     {
         this.seckillProductRepository=seckillProductRepository;
@@ -72,6 +75,17 @@ public class SeckillService {
     public SeckillProduct getProduct(Long productId){
        SeckillProduct product=seckillProductRepository.findById(productId).orElse(null);
             return product;          
+    }
+    private String getCurrentUsername(){
+        Authentication authentication =
+            SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null
+            || !authentication.isAuthenticated()
+            || authentication.getName() == null
+            || authentication.getName().isBlank()) {
+            throw new SeckillException("用户未登录");
+        }
+        return authentication.getName();
     }
     
 
@@ -90,9 +104,7 @@ public class SeckillService {
         }
         String stockKey = "stock:" + productId;
         String buyKey = "seckill:users:" + productId;
-        String username = SecurityContextHolder.getContext()
-                .getAuthentication()
-                .getName();
+        String username = getCurrentUsername();
 
         Long result = redisTemplate.execute(
                 STOCK_SCRIPT,
@@ -130,11 +142,9 @@ public class SeckillService {
         if(order==null){
             throw new SeckillException("订单不存在");
         }
-        String username =SecurityContextHolder.getContext()
-            .getAuthentication()
-            .getName();
+        String username =getCurrentUsername();
         if(!username.equals(order.getUsername())){
-            throw new SeckillException("该订单您没有访问权限");
+            throw new SeckillException("订单不存在");
         }
         log.info("订单查询成功,orderId={},username={}",orderId,username);   
         return order;
