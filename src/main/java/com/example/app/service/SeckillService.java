@@ -15,6 +15,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 @Service
@@ -160,14 +162,14 @@ public class SeckillService {
             throw new SeckillException("订单是过期状态");
         }
         SeckillProduct product =order.getProduct();
+        if(seckillOrderRepository.markPaidIfPending(orderId, LocalDateTime.now())==0){
+                throw new SeckillException("支付失败");
+            }
         if(seckillProductRepository.deductStock(product.getId())==0)
         {
             throw new SeckillException("库存不足");
         }else{
-            order.setStatus(OrderStatus.PAID);
-            log.info("订单支付成功,orderId={}, username={}, productId={}", 
-            order.getId(), order.getUsername(), product.getId());
-            order.setPayTime(LocalDateTime.now());
+            log.info("订单支付成功,orderId={}, username={}, productId={}", order.getId(), order.getUsername(), product.getId());
             String buyKey = "seckill:users:" + product.getId();
             Long remove=redisTemplate.opsForSet().remove(buyKey,order.getUsername());
             if(remove!=null&&remove>0){
@@ -175,10 +177,14 @@ public class SeckillService {
             }else{
                 log.warn("限购标记删除失败,buyKey={},username={}",buyKey,order.getUsername());
             }
-            seckillOrderRepository.save(order);
             log.info("订单支付成功数据已更新保存,orderId={},username={}, productId={}", order.getId(), order.getUsername(), product.getId());
-            return order;
-        }}
+            
+        }
+        LocalDateTime payTime = LocalDateTime.now();
+        order.setStatus(OrderStatus.PAID);
+        order.setPayTime(payTime);
+        return order;
+    }
     public SeckillOrder cancelExpiredOrder(SeckillOrder order){
         if(!order.getStatus().equals(OrderStatus.PENDING)){
             return order;
