@@ -49,12 +49,11 @@ cd ~/project-zz/seckill-demo   # 或你的实际路径
 mvn spring-boot:run
 ```
 
-Swagger（启动后试哪个能开用哪个）：
+接口文档：
 
-- http://localhost:8080/swagger-ui/index.html
-- http://localhost:8080/swagger-ui.html
+http://localhost:8080/swagger-ui/index.html
 
-登录后把 Token 填到 Authorize（`Bearer <token>`）。
+登录后在 Authorize 里填 `Bearer <token>`。
 
 ## 建议调用顺序
 
