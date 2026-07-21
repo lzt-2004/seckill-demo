@@ -160,27 +160,25 @@ public class SeckillService {
             throw new SeckillException("订单是过期状态");
         }
         SeckillProduct product =order.getProduct();
-        if (product.getStock() <= 0) {
-            log.warn("数据库库存不足, productId={},stock={}",product.getId(),product.getStock());
-            throw new SeckillException("真实库存不足");
-        }
-
-        order.setStatus(OrderStatus.PAID);
-        log.info("订单支付成功,orderId={}, username={}, productId={}", order.getId(), order.getUsername(), product.getId());
-        order.setPayTime(LocalDateTime.now());
-        product.setStock(product.getStock() - 1);
-        String buyKey = "seckill:users:" + product.getId();
-        Long remove=redisTemplate.opsForSet().remove(buyKey,order.getUsername());
-        if(remove!=null&&remove>0){
-            log.info("限购标记删除成功,buyKey={},username={}",buyKey,order.getUsername()); 
+        if(seckillProductRepository.deductStock(product.getId())==0)
+        {
+            throw new SeckillException("库存不足");
         }else{
-            log.warn("限购标记删除失败,buyKey={},username={}",buyKey,order.getUsername());
-        }
-        seckillProductRepository.save(product);
-        seckillOrderRepository.save(order);
-        log.info("订单支付成功数据已更新保存,orderId={},username={}, productId={}", order.getId(), order.getUsername(), product.getId());
-        return order;
-    }
+            order.setStatus(OrderStatus.PAID);
+            log.info("订单支付成功,orderId={}, username={}, productId={}", 
+            order.getId(), order.getUsername(), product.getId());
+            order.setPayTime(LocalDateTime.now());
+            String buyKey = "seckill:users:" + product.getId();
+            Long remove=redisTemplate.opsForSet().remove(buyKey,order.getUsername());
+            if(remove!=null&&remove>0){
+                log.info("限购标记删除成功,buyKey={},username={}",buyKey,order.getUsername()); 
+            }else{
+                log.warn("限购标记删除失败,buyKey={},username={}",buyKey,order.getUsername());
+            }
+            seckillOrderRepository.save(order);
+            log.info("订单支付成功数据已更新保存,orderId={},username={}, productId={}", order.getId(), order.getUsername(), product.getId());
+            return order;
+        }}
     public SeckillOrder cancelExpiredOrder(SeckillOrder order){
         if(!order.getStatus().equals(OrderStatus.PENDING)){
             return order;
