@@ -200,7 +200,7 @@ public class SeckillService {
             String stockKey = "stock:" + productId;
             String buyKey = "seckill:users:" + productId;
 
-            if(seckillOrderRepository.cencalIfPending(order.getId())==0){
+            if(seckillOrderRepository.cancelIfPending(order.getId())==0){
                 log.info("订单已支付,不在执行本次取消订单任务username={},orderId={},productId={}",username,order.getId(),productId);
                 return order;
             }

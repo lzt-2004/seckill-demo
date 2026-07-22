@@ -1,14 +1,18 @@
 package com.example.app.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import com.example.app.common.ApiResponse;
 import com.example.app.exception.BusinessException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<String>> handleIllegalArgument(IllegalArgumentException ex) {
@@ -17,21 +21,21 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<String>> handleException(Exception ex) {
+        log.error("未处理异常", ex);
         return ResponseEntity.internalServerError()
-            .body(ApiResponse.fail(500,"服务器内部问题" + ex.getMessage()));
+            .body(ApiResponse.fail(500, "服务器内部错误"));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<String>> handleValidationException(MethodArgumentNotValidException ex) {
         String message = ex.getBindingResult().getFieldErrors().get(0).getDefaultMessage();
-
-        return ResponseEntity.badRequest().body(ApiResponse.fail(400,message));
+        return ResponseEntity.badRequest().body(ApiResponse.fail(400, message));
     }
-      
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException ex) {
-    System.out.println(ex.getLogMessage()); 
-    return ResponseEntity.status(ex.getStatus())
+        log.warn("{}", ex.getLogMessage());
+        return ResponseEntity.status(ex.getStatus())
             .body(ApiResponse.fail(ex.getCode(), ex.getMessage()));
-}
+    }
 }

@@ -17,10 +17,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.util.Collections;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JpaUserRepository repository;
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     public JwtAuthenticationFilter(JpaUserRepository repository){
         this.repository=repository;
@@ -52,7 +55,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     if(role==null){
                         role=UserRole.BUYER;
                     }
-                    System.out.println("当前用户：" + username + "，数据库角色：" + role);
+                    log.debug("当前用户,username={},用户身份,role={}", username,role);
                     GrantedAuthority authority =new SimpleGrantedAuthority("ROLE_" + role.name());
 
                     UsernamePasswordAuthenticationToken authentication =new UsernamePasswordAuthenticationToken(

@@ -20,7 +20,7 @@ public interface SeckillOrderRepository extends JpaRepository<SeckillOrder, Long
                       @Param("payTime") java.time.LocalDateTime payTime);
     @Modifying
     @Query("UPDATE SeckillOrder o SET o.status=com.example.app.model.OrderStatus.CANCELLED WHERE o.id=:orderId AND o.status=com.example.app.model.OrderStatus.PENDING")
-    int cencalIfPending(@Param("orderId") Long orderId);
+    int cancelIfPending(@Param("orderId") Long orderId);
 
 }
 

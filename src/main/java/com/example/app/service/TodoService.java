@@ -18,11 +18,14 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.Collections;
 import java.util.UUID;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 @Service
 public class TodoService {
     private final TodoRepository todoRepository;
     private final JpaUserRepository jpaUserRepository;
     private final StringRedisTemplate redisTemplate; 
+    private static final Logger log = LoggerFactory.getLogger(TodoService.class);
   
     private static final DefaultRedisScript<Long> UNLOCK_SCRIPT;
 
@@ -45,49 +48,35 @@ public class TodoService {
     }
     @Transactional
     public Todo createTodo(String title,String content){
-        // 从SecurityContextHolder 拿当前登录用户的用户名
         String username = SecurityContextHolder.getContext()
                 .getAuthentication()
-                .getName();
-        // 根据用户名查用户
+                .getName();   
         User user = jpaUserRepository.findByUsername(username);
-        
-        // 创建待办
         Todo todo = new Todo(title, content, user);
         Todo savedTodo = todoRepository.save(todo);
-    
-        // 清除缓存
         String cacheKey = "todos:" + username;
         redisTemplate.delete(cacheKey);
         return savedTodo;
     }
-
    public List<Todo> getMyTodos() {
     String username = SecurityContextHolder.getContext()
             .getAuthentication()
             .getName();
     String cacheKey = "todos:" + username;
-
-    // 1. 先从 Redis 拿（JSON 字符串）
     String cachedJson = redisTemplate.opsForValue().get(cacheKey);
     if (cachedJson != null) {
-        System.out.println("从 Redis 缓存获取待办列表");
+        log.debug("从 Redis 缓存获取待办列表,username={}",username);
         try {
             ObjectMapper mapper = new ObjectMapper();
             mapper.registerModule(new JavaTimeModule());
             return mapper.readValue(cachedJson, new TypeReference<List<Todo>>() {});
         } catch (Exception e) {
-            // JSON 解析失败，删掉缓存重新查
             redisTemplate.delete(cacheKey);
         }
     }
-
-    // 2. Redis 没有，查数据库
-    System.out.println("从数据库查询待办列表");
+    log.debug("从数据库查询待办列表,username={}",username);
     User user = jpaUserRepository.findByUsername(username);
     List<Todo> todos = todoRepository.findByUserId(user.getId());
-
-    // 3. 存到 Redis（转 JSON 字符串）
     try {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
@@ -95,29 +84,25 @@ public class TodoService {
         int expireMinutes = 10 + ThreadLocalRandom.current().nextInt(1, 6);
         redisTemplate.opsForValue().set(cacheKey, json,expireMinutes , TimeUnit.MINUTES);
     } catch (Exception e) {
-        System.out.println("缓存写入失败：" + e.getMessage());
+        log.error("缓存写入失败：" , e);
     }
-
     return todos;
 }
     public Todo getTodoById(Long id) {
     String currentUser = SecurityContextHolder.getContext()
             .getAuthentication()
             .getName();
-
     String cacheKey = "todo:" + currentUser + ":" + id;
     String cachedJson = redisTemplate.opsForValue().get(cacheKey);
-
     if (cachedJson != null) {
         if ("null".equals(cachedJson)) {
-            System.out.println("从 Redis 缓存获取单个待办, id="+id);
+            log.debug("从 Redis 缓存获取单个待办, id={}" , id);
             throw new TodoNotFoundException(id);
         }
-
         try {
             ObjectMapper mapper = new ObjectMapper();
             mapper.registerModule(new JavaTimeModule());
-            System.out.println("从 Redis 缓存获取单个待办, id="+id);
+            log.debug("从 Redis 缓存获取单个待办, id={}" , id);
             return mapper.readValue(cachedJson, Todo.class);
         } catch (Exception e) {
             redisTemplate.delete(cacheKey);
@@ -127,7 +112,6 @@ public class TodoService {
     String lockValue = UUID.randomUUID().toString();
     Boolean locked = redisTemplate.opsForValue()
         .setIfAbsent(lockKey, lockValue, 10, TimeUnit.SECONDS);
-    
     if (Boolean.TRUE.equals(locked)) {
         try {
             String retryJson = redisTemplate.opsForValue().get(cacheKey);
@@ -138,27 +122,23 @@ public class TodoService {
                 try{
                     ObjectMapper mapper = new ObjectMapper();
                     mapper.registerModule(new JavaTimeModule());
-                    System.out.println("从 Redis 缓存获取单个待办, id=" + id);
+                    log.debug("从 Redis 缓存获取单个待办, id={}" , id);
                     return mapper.readValue(retryJson, Todo.class);
                 }
                 catch(Exception e){
                     redisTemplate.delete(cacheKey);
                 }
             }
-
-            System.out.println("从数据库查询单个待办");
+            log.debug("从数据库查询单个待办,username={},todoId={}",currentUser,id);
             Todo todo = todoRepository.findById(id)
                 .orElse(null);
-
             if (todo == null) {
                 redisTemplate.opsForValue().set(cacheKey, "null", 2, TimeUnit.MINUTES);
                 throw new TodoNotFoundException(id);
             }
-
             if (!todo.getUser().getUsername().equals(currentUser)) {
                 throw new UnauthorizedAccessException("无权查看别人的待办");
             }
-
             try {
                 ObjectMapper mapper = new ObjectMapper();
                 mapper.registerModule(new JavaTimeModule());
@@ -167,9 +147,8 @@ public class TodoService {
                 redisTemplate.opsForValue().set(cacheKey, json, expireMinutes, TimeUnit.MINUTES);
             } catch (Exception e)
             {
-                System.out.println("单个 Todo 缓存写入失败：" + e.getMessage());
+                log.error("单个 Todo 缓存写入失败",e);
             }
-
             return todo;
         } 
         finally 
@@ -179,26 +158,24 @@ public class TodoService {
                 Collections.singletonList(lockKey),
                 lockValue
         );
-        }
-                
+        } 
     }
     try {
         Thread.sleep(100);
     } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
     }
-
     String retryJson = redisTemplate.opsForValue().get(cacheKey);
     if (retryJson != null) {
         if ("null".equals(retryJson)) {
-            System.out.println("从 Redis 缓存获取单个待办, id=" + id);
+            log.debug("从 Redis 缓存获取单个待办, id={}",id);
             throw new TodoNotFoundException(id);
         }
 
         try {
             ObjectMapper mapper = new ObjectMapper();
             mapper.registerModule(new JavaTimeModule());
-            System.out.println("从 Redis 缓存获取单个待办, id=" + id);
+            log.debug("从 Redis 缓存获取单个待办, id={}",id);
             return mapper.readValue(retryJson, Todo.class);
         } catch (Exception e) {
             redisTemplate.delete(cacheKey);
@@ -244,7 +221,6 @@ public class TodoService {
 public void deleteTodo(Long id){
     Todo todo = todoRepository.findById(id)
             .orElseThrow(() -> new TodoNotFoundException(id));
-    // 2. 检查权限：这个待办是不是当前用户的
     String currentUser = SecurityContextHolder.getContext()
             .getAuthentication()
             .getName();
@@ -252,7 +228,6 @@ public void deleteTodo(Long id){
         throw new UnauthorizedAccessException("无权操作别人的待办");
     }
     todoRepository.delete(todo);
-    // 清除缓存
     String listCacheKey = "todos:" + currentUser;
     String todoCacheKey = "todo:" + currentUser+":"+id;
     redisTemplate.delete(listCacheKey);

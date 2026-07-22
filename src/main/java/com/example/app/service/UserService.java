@@ -10,10 +10,13 @@ import com.example.app.exception.UsernameAlreadyExistsException;
 import com.example.app.exception.AuthenticationFailedException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 @Service
 public class UserService {
     private final JpaUserRepository repository;
     private final PasswordEncoder passwordEncoder;
+    private static final Logger log =LoggerFactory.getLogger(UserService.class);
 
     public UserService(JpaUserRepository repository, PasswordEncoder passwordEncoder) {
     this.repository = repository;
@@ -34,7 +37,7 @@ public class UserService {
         User user = new User(username,encoderPassword, age);
         repository.save(user);
 
-        System.out.println("成功添加用户：" + username);
+        log.info("成功添加用户,username={}" , username);
     }
 
     public User findUser(String username) {
@@ -55,7 +58,7 @@ public class UserService {
         }
 
         repository.deleteByUsername(username);
-        System.out.println("成功删除用户：" + username);
+        log.info("成功删除用户,username={}" , username);
     }
     @Transactional
     public void updateUser(String oldUsername,String oldPassword,String newUsername,String newPassword,int newAge){
