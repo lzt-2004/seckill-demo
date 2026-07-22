@@ -1,88 +1,89 @@
 # seckill-demo
 
-Spring Boot 秒杀练习项目。覆盖登录鉴权、角色权限、Redis 抢购、下单支付和超时取消。
+个人练手的 Spring Boot 秒杀后端。从注册登录、角色权限，到 Redis 抢购、下单支付、超时取消都串了一遍。
 
-学习用，别当生产系统抄。
+不是生产项目，别直接当高并发方案抄。
 
-## 技术
+## 用了什么
 
-- Java 17 / Spring Boot 3
+- Java 17、Spring Boot 3
 - Spring Security + JWT + BCrypt
-- MySQL + JPA
-- Redis（抢购用 Lua）
-- Maven、SpringDoc Swagger
+- MySQL、Spring Data JPA
+- Redis（抢购 / 回滚用 Lua）
+- Maven、SpringDoc（Swagger）
 
-## 现在做成什么样了
+## 功能概览
 
-**用户与权限**
+**权限**
 
-- 角色：`BUYER`、`MERCHANT`、`ADMIN`，注册默认 `BUYER`
-- JWT 过滤器从数据库读角色，组装成 `ROLE_XXX`
-- 建商品、改商品、预热/重置缓存：商家或管理员
-- 改别人角色、删用户等：管理员
+- 三种角色：`BUYER`、`MERCHANT`、`ADMIN`，新注册默认买家
+- Token 里不信死角色，过滤器会查库再拼 `ROLE_XXX`
+- 商品增改、库存预热：商家或管理员
+- 改别人角色之类：管理员
 
-**秒杀链路**
+**秒杀怎么走**
 
-1. 商家建商品，预热把库存写入 Redis  
-2. 用户抢购：Lua 扣 Redis 库存 + 记限购，成功写 `PENDING` 订单  
+1. 商家建商品，预热把库存灌进 Redis  
+2. 用户抢购：Lua 扣 Redis 资格库存，并记进已抢名单；成功生成 `PENDING` 订单（这时 MySQL 库存还不动）  
 3. 支付：  
-   - 订单归属校验（只能操作自己的单，别人的统一当「订单不存在」）  
-   - 条件更新订单：`PENDING` 才改成 `PAID`（挡并发重复支付）  
-   - 条件扣 MySQL 库存：`stock > 0` 才减 1（挡支付超卖）  
-4. 超时未付：定时任务取消订单，Lua 回滚 Redis 资格和库存  
+   - 只能付自己的单，别人的单统一回「订单不存在」  
+   - 订单用条件更新：`PENDING` 才能改成 `PAID`  
+   - 库存也用条件更新：`stock > 0` 才减 1  
+   - 支付成功后从 Redis 名单里删掉自己（当前实现下付完还能再抢）  
+4. 超时没付：定时任务扫，或支付时发现过期会懒取消；订单 `PENDING` → `CANCELLED`，再 Lua 把 Redis 资格吐回去  
 
-**另外**
+取消订单同样是「先条件更新抢到取消权，再动 Redis」，避免和支付打架时把已支付单盖掉。
 
-- 项目里还有个 Todo 接口，练缓存用的，和秒杀主线无关。
+**旁路**
 
-## 本地跑起来
+- `/todos` 练过缓存和 Redis 分布式锁，跟秒杀主流程没关系。
 
-需要：JDK 17、Maven、MySQL、Redis。
+## 怎么跑
+
+本机要有 JDK 17、Maven、MySQL、Redis。
 
 ```bash
 cp src/main/resources/application-example.yml src/main/resources/application.yml
-# 改数据库账号密码，库名默认示例是 user_demo，先在 MySQL 里建好库
+# 改账号密码；示例库名 user_demo，没有就先建库
 ```
 
 ```bash
-cd ~/project-zz/seckill-demo   # 或你的实际路径
+cd ~/project-zz/seckill-demo   # 按你自己的目录改
 mvn spring-boot:run
 ```
 
-接口文档：
+文档地址：
 
 http://localhost:8080/swagger-ui/index.html
 
-登录后在 Authorize 里填 `Bearer <token>`。
+Authorize 里填：`Bearer <你的token>`。
 
-## 建议调用顺序
+## 建议点接口顺序
 
-1. `POST /users` 注册  
-2. `POST /auth/login` 登录拿 token  
-3. 商家/管理员 `POST /api/products` 建商品  
-4. `POST /api/products/{id}/update` 或 reset 预热 Redis  
-5. `POST /api/seckill/{productId}` 抢购  
-6. `GET /api/seckill/orders/{orderId}` 查单  
-7. `PUT /api/seckill/pay/{orderId}` 支付  
+1. 注册 `POST /users`  
+2. 登录 `POST /auth/login`  
+3. 商家建商品 `POST /api/products`  
+4. 预热 `POST /api/products/{id}/update` 或 reset  
+5. 抢购 `POST /api/seckill/{productId}`  
+6. 查单 `GET /api/seckill/orders/{orderId}`  
+7. 支付 `PUT /api/seckill/pay/{orderId}`  
 
-## 设计上几点说明
+## 为啥要两层库存
 
-| 环节 | 做法 | 为啥 |
-|------|------|------|
-| 抢购 | Redis + Lua | 高并发下先挡一波，资格库存走缓存 |
-| 支付扣库存 | MySQL `UPDATE ... WHERE stock > 0` | 真库存落库，避免 Java 读改存空窗超卖 |
-| 支付改状态 | `UPDATE ... WHERE status = PENDING` | 同一单并发支付时最多成功一次 |
-| 看别人订单 | 也返回「订单不存在」 | 少泄露「有这个单但不是你的」 |
+抢购一瞬间人多，不宜人人打 MySQL 扣真货。
 
-支付方法带 `@Transactional`：条件更新订单成功但扣库存失败时会回滚，订单不会卡在已支付。
+- **Redis**：发资格、挡重复抢，快  
+- **MySQL**：用户真付钱时再扣货，用 `WHERE stock > 0` / `WHERE status = PENDING` 把「判断」和「改」绑在一条更新里，少出现 Java 先读后写那种空窗  
+
+支付方法挂了事务：订单条件更新成功但扣库存失败时会整笔回滚，避免单子显示已付、货却没扣上。
 
 ## 已知限制
 
-- 严格「两请求同一毫秒双支付」没上压测工具验过，主要靠条件更新逻辑兜底  
-- 支付成功后会清 Redis 限购标记，同一用户理论上可以再抢（目前不是终身限购一次）  
-- 支付和超时取消撞在一起的边界还可以再收紧（例如订单级锁），还没做  
-- JWT 密钥等别往公开仓库硬编码真密钥  
-- 异常文案、日志、README 都还在边做边补  
+- 没做过 JMeter 一类真高压，极限表现心里没数；功能路径和串行场景测过一些  
+- 支付成功会清限购名单，不是「这商品终身只能买一次」  
+- 支付和超时取消主要靠数据库条件更新互斥，没再加订单级分布式锁  
+- JWT 密钥之类别往公开仓库塞生产配置  
+- 异常对外统一 `ApiResponse`，细节打在服务端日志，不把堆栈塞给前端  
 
 ## 仓库
 
