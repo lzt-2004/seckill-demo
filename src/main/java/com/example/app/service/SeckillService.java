@@ -185,6 +185,7 @@ public class SeckillService {
         order.setPayTime(payTime);
         return order;
     }
+    @Transactional
     public SeckillOrder cancelExpiredOrder(SeckillOrder order){
         if(!order.getStatus().equals(OrderStatus.PENDING)){
             return order;
@@ -199,6 +200,10 @@ public class SeckillService {
             String stockKey = "stock:" + productId;
             String buyKey = "seckill:users:" + productId;
 
+            if(seckillOrderRepository.cencalIfPending(order.getId())==0){
+                log.info("订单已支付,不在执行本次取消订单任务username={},orderId={},productId={}",username,order.getId(),productId);
+                return order;
+            }
             Long resultTwo = redisTemplate.execute(
                 STOCK_SCRIPTTWO,
                 Arrays.asList(stockKey, buyKey),
@@ -215,19 +220,19 @@ public class SeckillService {
             }
             if(resultTwo==1L){
                 order.setStatus(OrderStatus.CANCELLED);
-                seckillOrderRepository.save(order);
                 log.info("释放资格成功订单状态已更新,username={},orderId={},productId={}",username,order.getId(),productId);
                 return order;
             }
             if (resultTwo == 2L) {
                 log.warn("释放缓存资格失败订单是待支付但是用户不在已抢订单名单内,orderId={}, username={}, productId={}", order.getId(), order.getUsername(), productId);
-                throw new SeckillException("出现异常了");
+                return order;
             }
             log.warn("释放缓存资格失败未知异常");
             throw new SeckillException("出现异常了");
+        }
     }
 
 
 
     
-}
+
