@@ -74,6 +74,14 @@ public class SeckillService {
         this.redisTemplate=redisTemplate;
         this.seckillOrderRepository=seckillOrderRepository;
     }
+    private Long deductStockLua(String stockKey,String buyKey,String username){
+            return redisTemplate.execute(STOCK_SCRIPT,Arrays.asList(stockKey, buyKey),username);
+        }
+    private Long rollbackStockLua(String stockKey,String buyKey,String username){
+            return redisTemplate.execute(STOCK_SCRIPTTWO,Arrays.asList(stockKey, buyKey),username);
+        }
+
+
     public SeckillProduct getProduct(Long productId){
        SeckillProduct product=seckillProductRepository.findById(productId).orElse(null);
             return product;          
@@ -90,7 +98,6 @@ public class SeckillService {
         return authentication.getName();
     }
     
-
     public String seckill(Long productId) {
         SeckillProduct product = getProduct(productId);
         if (product == null) {
@@ -107,37 +114,43 @@ public class SeckillService {
         String stockKey = "stock:" + productId;
         String buyKey = "seckill:users:" + productId;
         String username = getCurrentUsername();
+        Long result = deductStockLua(stockKey, buyKey, username);
+        
+        if (result == null) {
+            throw new SeckillException("Lua 执行异常");
+        }
 
-        Long result = redisTemplate.execute(
-                STOCK_SCRIPT,
-                Arrays.asList(stockKey, buyKey),
-                username
-        );
-        if (result != null && result == 2L) {
-            log.warn("用户重复抢购username={}, productId={}", username, productId);
+        if (result == 2L) {
             return "你已购买";
         }
 
-        if (result != null && result == 1L) {
+        if (result == 0L) {
+            return "库存不够";
+        }
+
+        if (result != 1L) {
+            throw new SeckillException("Lua 返回未知结果");
+        }
+        try{    
             OrderStatus status = OrderStatus.PENDING;
             LocalDateTime createTime = now;
             LocalDateTime expireTime = now.plusMinutes(10);
 
-            SeckillOrder seckillOrder = new SeckillOrder(
-                    username, product, status, createTime, expireTime
-            );
-            seckillOrderRepository.save(seckillOrder);
-            log.info("用户抢购成功数据已保存,username={}, productId={}, orderId={}",
-                    username, productId, seckillOrder.getId());
+            SeckillOrder seckillOrder = new SeckillOrder(username, product, status, createTime, expireTime);
+            seckillOrderRepository.saveAndFlush(seckillOrder);
+            log.info("用户抢购成功数据已保存,username={}, productId={}, orderId={}",username, productId, seckillOrder.getId());
             return "抢到了，订单号：" + seckillOrder.getId();
-        }
+        }catch(Exception exception){
+            try {
+                Long rollbackResult = rollbackStockLua(stockKey,buyKey, username);
+                log.error("订单创建失败，已尝试补偿 Redis 资格，username={}, productId={}, rollbackResult={}",username, productId, rollbackResult, exception);
+            } catch (Exception rollbackException) {
+                log.error("订单创建失败且 Redis 补偿失败，需要人工核对，username={}, productId={}",username, productId, rollbackException);
+            }
 
-        if (result != null && result == 0L) {
-            log.warn("获取缓存资格失败库存不够,username={},productId={}",username,productId);
-            return "库存不够";
+            throw new SeckillException("创建订单失败，请稍后重试");
         }
-        log.warn("获取缓存资格失败lua执行异常,username={},productId={}",username,productId);
-        throw new SeckillException( "lua执行异常");
+        
     }
     public SeckillOrder getOrderById(Long orderId){
         SeckillOrder order = seckillOrderRepository.findById(orderId).orElse(null);
@@ -204,11 +217,7 @@ public class SeckillService {
                 log.info("订单已支付,不在执行本次取消订单任务username={},orderId={},productId={}",username,order.getId(),productId);
                 return order;
             }
-            Long resultTwo = redisTemplate.execute(
-                STOCK_SCRIPTTWO,
-                Arrays.asList(stockKey, buyKey),
-                username
-            );
+            Long resultTwo = rollbackStockLua(stockKey, buyKey, username);
 
             if (resultTwo == null) {
                 log.warn("释放缓存资格失败回滚脚本执行失败,username={},orderId={},productId={}",username,order.getId(),productId);
@@ -229,6 +238,30 @@ public class SeckillService {
             }
             log.warn("释放缓存资格失败未知异常");
             throw new SeckillException("出现异常了");
+        }
+        @Transactional
+        public SeckillOrder cancelOrder(Long orderId) {
+            SeckillOrder order = getOrderById(orderId);
+
+            if (order.getStatus() != OrderStatus.PENDING) {
+                throw new SeckillException("当前订单不能取消");
+            }
+
+            int rows = seckillOrderRepository.cancelIfPending(orderId);
+            if (rows == 0) {
+                throw new SeckillException("订单状态已变化，取消失败");
+            }
+
+            Long productId = order.getProduct().getId();
+            String stockKey = "stock:" + productId;
+            String buyKey = "seckill:users:" + productId;
+            Long rollbackResult = rollbackStockLua(stockKey,buyKey,order.getUsername());
+            if (rollbackResult == null || rollbackResult != 1L) {
+                throw new SeckillException("取消订单失败，释放抢购资格失败");
+            }
+            order.setStatus(OrderStatus.CANCELLED);
+            log.info("用户主动取消订单成功，orderId={}, username={}, productId={}",orderId, order.getUsername(), productId);
+            return order;
         }
     }
 

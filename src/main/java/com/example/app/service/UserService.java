@@ -97,6 +97,31 @@ public class UserService {
         repository.save(user);
         return user;
     }
+    @Transactional
+    public void createTestUsers() {
+        int createdCount = 0;
+        int skippedCount = 0;
+
+        for (int i = 0; i < 100; i++) {
+            String username = "testUser_" + i;
+            String password = "123456";
+            int age = 20;
+
+            if (repository.existsByUsername(username)) {
+                skippedCount++;
+                continue;
+            }
+
+            String encodedPassword = passwordEncoder.encode(password);
+            User user = new User(username, encodedPassword, age);
+            repository.save(user);
+
+            createdCount++;
+        }
+
+        log.info("测试账号准备完成，新增={}, 已存在={}",
+            createdCount, skippedCount);
+    }
 
    
 }

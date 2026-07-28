@@ -48,6 +48,14 @@ public class UserController {
              return ResponseEntity.ok(ApiResponse.success("成功添加用户："+request.getUsername()));
         
     }
+    @Operation(summary = "批量创建用户(管理员)", description = "批量创建用户信息")
+    @PostMapping("/test")
+    public ResponseEntity<ApiResponse<String>> registers() {
+        
+            service.createTestUsers();
+            return ResponseEntity.ok(ApiResponse.success("成功批量添加用户"));
+        
+    }
     @Operation(summary = "删除用户", description = "通过名字删除用户信息")
     @DeleteMapping("/{username}")
     public ResponseEntity<ApiResponse<String>> deleteUser(@PathVariable String username) {
@@ -62,7 +70,7 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("成功将用户：" + username+"修改为"+request.getUsername()));
 
     }
-    @Operation(summary = "修改用户身份", description = "管理员通过名字将用户身份从buyer修改为merchant")
+    @Operation(summary = "修改用户身份(管理员)", description = "管理员通过名字将用户身份从buyer修改为merchant")
     @PutMapping("/{username}/admin")
     public ResponseEntity<ApiResponse<User>> putUserRole(@PathVariable String username){
         return ResponseEntity.ok(ApiResponse.success(service.updateUserRole(username)));

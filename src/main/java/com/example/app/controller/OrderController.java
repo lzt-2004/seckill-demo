@@ -35,6 +35,11 @@ public class OrderController {
     public ApiResponse<SeckillOrder> updateOrder(@PathVariable Long orderId){
         return ApiResponse.success(seckillService.payOrder(orderId));
     }
+    @Operation(summary = "取消订单", description = "取消指定订单，超时未支付会自动取消并回滚库存")
+    @PostMapping("/cancel/{orderId}")
+    public ApiResponse<SeckillOrder> cancelOrder(@PathVariable Long orderId) {
+        return ApiResponse.success(seckillService.cancelOrder(orderId));
+    }
     
 
     

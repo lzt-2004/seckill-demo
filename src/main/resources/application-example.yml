@@ -10,7 +10,13 @@ spring:
       ddl-auto: update
     show-sql: true
 
-  data:  # ← 这里要 2 个空格，和上面的 datasource、jpa 对齐
+  data:  
     redis:
       host: localhost
       port: 6379
+      
+app:
+  load-test:
+    enabled: false
+    base-url: http://127.0.0.1:8080
+    test-password: 123456
