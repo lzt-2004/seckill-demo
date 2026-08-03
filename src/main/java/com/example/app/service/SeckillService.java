@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.List;
 @Service
 public class SeckillService {
     private static final Logger log = LoggerFactory.getLogger(SeckillService.class);
@@ -163,6 +164,10 @@ public class SeckillService {
         }
         log.info("订单查询成功,orderId={},username={}",orderId,username);   
         return order;
+    }
+    public List<SeckillOrder> getMyOrders(){
+        String username = getCurrentUsername();
+        return seckillOrderRepository.findByUsernameOrderByCreateTimeDesc(username);
     }
     @Transactional
     public SeckillOrder payOrder(Long orderId) {

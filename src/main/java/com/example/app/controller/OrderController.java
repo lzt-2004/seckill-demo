@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.List;
 
 
 @RequestMapping("/api/seckill")
@@ -24,6 +25,11 @@ public class OrderController {
     public OrderController(SeckillService seckillService){
         this.seckillService=seckillService;
         
+    }
+    @Operation(summary = "查询我的订单", description = "查询当前登录用户的全部订单，按创建时间倒序返回")
+    @GetMapping("/orders")
+    public ApiResponse<List<SeckillOrder>> getMyOrders(){
+        return ApiResponse.success(seckillService.getMyOrders());
     }
     @Operation(summary = "查询订单", description = "根据订单ID查询订单详情,包含商品信息和订单状态")   
     @GetMapping("/orders/{orderId}")

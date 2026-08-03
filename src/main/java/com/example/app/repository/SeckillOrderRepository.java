@@ -13,6 +13,7 @@ import java.util.List;
 
 public interface SeckillOrderRepository extends JpaRepository<SeckillOrder, Long> {
     List<SeckillOrder> findByStatusAndExpireTimeBefore(OrderStatus status,LocalDateTime now);
+    List<SeckillOrder> findByUsernameOrderByCreateTimeDesc(String username);
 
     @Modifying
     @Query("UPDATE SeckillOrder o SET o.status = com.example.app.model.OrderStatus.PAID, o.payTime = :payTime WHERE o.id = :orderId AND o.status = com.example.app.model.OrderStatus.PENDING")
