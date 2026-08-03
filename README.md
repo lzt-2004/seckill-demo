@@ -110,6 +110,7 @@ JWT 过滤器校验 Token 格式、签名和过期时间，并按用户名查询
 | 商品管理 | POST/PATCH /api/products | MERCHANT 或 ADMIN |
 | 缓存重置 | POST /api/products/{id}/reset | 重建 Redis 库存和已购用户集合 |
 | 抢购 | POST /api/seckill/{productId} | 用户参与秒杀 |
+| 我的订单 | GET /api/seckill/orders | 仅返回当前登录用户的订单，按创建时间倒序 |
 | 查询订单 | GET /api/seckill/orders/{orderId} | 仅订单本人 |
 | 支付订单 | PUT /api/seckill/pay/{orderId} | 仅订单本人 |
 | 取消订单 | POST /api/seckill/cancel/{orderId} | 仅订单本人且状态为 PENDING |
@@ -244,8 +245,9 @@ mvn spring-boot:run
 3. ADMIN 调用 POST /users/test，创建 100 个测试账号
 4. 创建商品并执行 POST /api/products/{id}/reset
 5. 用户调用 POST /api/seckill/{productId} 创建 PENDING 订单
-6. 查询订单，支付或取消订单
-7. 在受控环境中开启 app.load-test.enabled，使用 ADMIN 调用压测接口
+6. 用户调用 GET /api/seckill/orders 查看自己的订单列表
+7. 查询订单详情，支付或取消订单
+8. 在受控环境中开启 app.load-test.enabled，使用 ADMIN 调用压测接口
 ~~~
 
 ## 已知限制与后续方向
