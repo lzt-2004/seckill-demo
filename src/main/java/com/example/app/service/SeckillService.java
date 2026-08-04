@@ -144,9 +144,9 @@ public class SeckillService {
         }catch(Exception exception){
             try {
                 Long rollbackResult = rollbackStockLua(stockKey,buyKey, username);
-                log.error("订单创建失败，已尝试补偿 Redis 资格，username={}, productId={}, rollbackResult={}",username, productId, rollbackResult, exception);
+                log.error("订单创建失败，已尝试补偿 Redis 资格，username={}, productId={}, stockKey={}, buyKey={}, rollbackResult={}", username, productId, stockKey, buyKey, rollbackResult, exception);
             } catch (Exception rollbackException) {
-                log.error("订单创建失败且 Redis 补偿失败，需要人工核对，username={}, productId={}",username, productId, rollbackException);
+                log.error("订单创建失败且 Redis 补偿失败，需要人工核对，username={}, productId={}, stockKey={}, buyKey={}", username, productId, stockKey, buyKey, rollbackException);
             }
 
             throw new SeckillException("创建订单失败，请稍后重试");
