@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Positive;
 import java.util.List;
 
 
@@ -38,12 +39,14 @@ public class OrderController {
     }
     @Operation(summary = "支付订单", description = "支付指定订单，超时未支付会自动取消并回滚库存")
     @PutMapping("/pay/{orderId}")
-    public ApiResponse<SeckillOrder> updateOrder(@PathVariable Long orderId){
+    public ApiResponse<SeckillOrder> updateOrder(
+            @PathVariable @Positive(message = "订单 ID 必须为正数") Long orderId){
         return ApiResponse.success(seckillService.payOrder(orderId));
     }
     @Operation(summary = "取消订单", description = "取消指定订单，超时未支付会自动取消并回滚库存")
     @PostMapping("/cancel/{orderId}")
-    public ApiResponse<SeckillOrder> cancelOrder(@PathVariable Long orderId) {
+    public ApiResponse<SeckillOrder> cancelOrder(
+            @PathVariable @Positive(message = "订单 ID 必须为正数") Long orderId) {
         return ApiResponse.success(seckillService.cancelOrder(orderId));
     }
     

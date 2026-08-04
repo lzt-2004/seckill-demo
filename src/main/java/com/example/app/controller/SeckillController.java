@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.constraints.Positive;
 
 @RestController
 @RequestMapping("/api/seckill")
@@ -22,7 +23,8 @@ public class SeckillController {
 
     @Operation(summary = "参与秒杀", description = "用户抢购指定商品，成功返回订单号")
     @PostMapping("/{productId}")
-    public ApiResponse<String> seckill(@PathVariable Long productId) {
+    public ApiResponse<String> seckill(
+            @PathVariable @Positive(message = "商品 ID 必须为正数") Long productId) {
         return ApiResponse.success(seckillService.seckill(productId));
     } 
     

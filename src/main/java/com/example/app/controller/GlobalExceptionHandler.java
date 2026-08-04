@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import com.example.app.common.ApiResponse;
 import com.example.app.exception.BusinessException;
 
@@ -29,6 +30,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<String>> handleValidationException(MethodArgumentNotValidException ex) {
         String message = ex.getBindingResult().getFieldErrors().get(0).getDefaultMessage();
+        return ResponseEntity.badRequest().body(ApiResponse.fail(400, message));
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ApiResponse<String>> handleMethodValidationException(HandlerMethodValidationException ex) {
+        String message = ex.getAllValidationResults().stream()
+            .flatMap(result -> result.getResolvableErrors().stream())
+            .findFirst()
+            .map(error -> error.getDefaultMessage())
+            .orElse("请求参数校验失败");
         return ResponseEntity.badRequest().body(ApiResponse.fail(400, message));
     }
 
