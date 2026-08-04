@@ -8,6 +8,7 @@ import com.example.app.exception.ProductNotFoundException;
 import com.example.app.exception.ProductStringException;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Sort;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +40,7 @@ public class ProductService{
         {
             throw new ProductException(request.getName(),existingProduct.getId());
         }
+        validateActivityTime(request.getStartTime(), request.getEndTime());
         SeckillProduct seckillProduct = new SeckillProduct(request.getName(),request.getStock(),request.getPrice(),request.getStartTime(),request.getEndTime());
         
         seckillProductRepository.save(seckillProduct);
@@ -55,6 +57,13 @@ public class ProductService{
                 throw new ProductStringException("商品名字重复了");
             }
         }
+        LocalDateTime startTime = request.getStartTime() != null
+                ? request.getStartTime()
+                : product.getStartTime();
+        LocalDateTime endTime = request.getEndTime() != null
+                ? request.getEndTime()
+                : product.getEndTime();
+        validateActivityTime(startTime, endTime);
         if(request.getName()!=null){
             product.setName(request.getName());
         }
@@ -73,6 +82,12 @@ public class ProductService{
         seckillProductRepository.save(product);
         log.info("商品数据更新成功,productId={}",product.getId());
         return product;
+    }
+
+    private void validateActivityTime(LocalDateTime startTime, LocalDateTime endTime) {
+        if (!startTime.isBefore(endTime)) {
+            throw new IllegalArgumentException("活动开始时间必须早于结束时间");
+        }
     }
 
 
