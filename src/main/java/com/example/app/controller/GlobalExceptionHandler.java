@@ -7,6 +7,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import com.example.app.common.ApiResponse;
 import com.example.app.exception.BusinessException;
 
@@ -29,8 +30,18 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<String>> handleValidationException(MethodArgumentNotValidException ex) {
-        String message = ex.getBindingResult().getFieldErrors().get(0).getDefaultMessage();
+        String message = ex.getBindingResult().getFieldErrors().stream()
+            .map(error -> error.getDefaultMessage())
+            .filter(errorMessage -> errorMessage != null && !errorMessage.isBlank())
+            .findFirst()
+            .orElse("请求参数校验失败");
         return ResponseEntity.badRequest().body(ApiResponse.fail(400, message));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<String>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        return ResponseEntity.badRequest()
+            .body(ApiResponse.fail(400, "请求参数格式不正确"));
     }
 
     @ExceptionHandler(HandlerMethodValidationException.class)
