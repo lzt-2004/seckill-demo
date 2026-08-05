@@ -5,6 +5,7 @@ import com.example.app.model.SeckillProduct;
 import com.example.app.repository.SeckillProductRepository;
 import com.example.app.repository.SeckillOrderRepository;
 import com.example.app.exception.SeckillException;
+import com.example.app.exception.ProductNotFoundException;
 
 import org.springframework.stereotype.Service;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -106,15 +107,15 @@ public class SeckillService {
     public String seckill(Long productId) {
         SeckillProduct product = getProduct(productId);
         if (product == null) {
-            return "商品不存在";
+            throw new ProductNotFoundException(productId);
         }
 
         LocalDateTime now = LocalDateTime.now();
         if (now.isBefore(product.getStartTime())) {
-            return "活动未开始";
+            throw new SeckillException("活动未开始");
         }
         if (now.isAfter(product.getEndTime())) {
-            return "活动已结束";
+            throw new SeckillException("活动已结束");
         }
         String stockKey = "stock:" + productId;
         String buyKey = "seckill:users:" + productId;
@@ -126,11 +127,11 @@ public class SeckillService {
         }
 
         if (result == LUA_DUPLICATE) {
-            return "你已购买";
+            throw new SeckillException("你已购买");
         }
 
         if (result == LUA_STOCK_UNAVAILABLE) {
-            return "库存不够";
+            throw new SeckillException("库存不够");
         }
 
         if (result == LUA_KEY_MISSING) {

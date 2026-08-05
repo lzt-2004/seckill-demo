@@ -84,33 +84,45 @@ public class SeckillLoadRunner {
         return counter.toResult(requests.size(), costMillis);
     }
 
-    private String seckill(Config config, TestUser user) throws Exception {
+    private SeckillResult seckill(Config config, TestUser user) throws Exception {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(config.baseUrl() + "/api/seckill/" + config.productId()))
                 .header("Authorization", "Bearer " + user.token())
                 .POST(HttpRequest.BodyPublishers.noBody()).build();
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         JsonNode body = objectMapper.readTree(response.body());
-        if (response.statusCode() != 200 || body.path("code").asInt(-1) != 0) {
-            throw new IllegalStateException("抢购接口失败，username=" + user.username());
+        if (response.statusCode() == 200 && body.path("code").asInt(-1) == 0) {
+            return SeckillResult.SUCCESS;
         }
-        return body.path("data").asText();
+        String message = body.path("message").asText();
+        if ("库存不够".equals(message)) {
+            return SeckillResult.OUT_OF_STOCK;
+        }
+        if ("你已购买".equals(message)) {
+            return SeckillResult.DUPLICATE;
+        }
+        throw new IllegalStateException("抢购接口失败，username=" + user.username() + "，response=" + response.body());
     }
 
     public record Config(String baseUrl, String testPassword, long productId, int userCount, int requestsPerUser, int threadCount) { }
     public record Result(int totalRequests, int successCount, int outOfStockCount, int duplicateCount, int errorCount, long costMillis) { }
     private record TestUser(String username, String token) { }
 
+    private enum SeckillResult {
+        SUCCESS, OUT_OF_STOCK, DUPLICATE
+    }
+
     private static class Counter {
         private final AtomicInteger successCount = new AtomicInteger();
         private final AtomicInteger outOfStockCount = new AtomicInteger();
         private final AtomicInteger duplicateCount = new AtomicInteger();
         private final AtomicInteger errorCount = new AtomicInteger();
-        private void record(String data) {
-            if (data.startsWith("抢到了，订单号：")) successCount.incrementAndGet();
-            else if ("库存不够".equals(data)) outOfStockCount.incrementAndGet();
-            else if ("你已购买".equals(data)) duplicateCount.incrementAndGet();
-            else errorCount.incrementAndGet();
+        private void record(SeckillResult result) {
+            switch (result) {
+                case SUCCESS -> successCount.incrementAndGet();
+                case OUT_OF_STOCK -> outOfStockCount.incrementAndGet();
+                case DUPLICATE -> duplicateCount.incrementAndGet();
+            }
         }
         private Result toResult(int total, long cost) {
             return new Result(total, successCount.get(), outOfStockCount.get(), duplicateCount.get(), errorCount.get(), cost);
