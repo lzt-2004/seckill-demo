@@ -185,8 +185,8 @@ public class SeckillService {
             throw new SeckillException("订单状态不是未支付状态");
         }
         SeckillOrder tempOrder = cancelExpiredOrder(order);
-        if(tempOrder.getStatus().equals(OrderStatus.CANCELLED)){
-            throw new SeckillException("订单是过期状态");
+        if (tempOrder.getStatus() == OrderStatus.CANCELLED) {
+            return tempOrder;
         }
         SeckillProduct product =order.getProduct();
         if(seckillOrderRepository.markPaidIfPending(orderId, LocalDateTime.now())==0){
@@ -231,6 +231,7 @@ public class SeckillService {
                 log.info("订单已支付,不在执行本次取消订单任务username={},orderId={},productId={}",username,order.getId(),productId);
                 return order;
             }
+            order.setStatus(OrderStatus.CANCELLED);
             Long resultTwo = rollbackStockLua(stockKey, buyKey, username);
 
             if (resultTwo == null) {

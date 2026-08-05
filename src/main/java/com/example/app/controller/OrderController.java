@@ -2,6 +2,7 @@ package com.example.app.controller;
 
 import com.example.app.service.SeckillService;
 import com.example.app.model.SeckillOrder;
+import com.example.app.model.OrderStatus;
 import com.example.app.common.ApiResponse;
 
 import org.springframework.web.bind.annotation.PutMapping;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Positive;
@@ -39,9 +41,14 @@ public class OrderController {
     }
     @Operation(summary = "支付订单", description = "支付指定订单，超时未支付会自动取消并回滚库存")
     @PutMapping("/pay/{orderId}")
-    public ApiResponse<SeckillOrder> updateOrder(
+    public ResponseEntity<ApiResponse<SeckillOrder>> updateOrder(
             @PathVariable @Positive(message = "订单 ID 必须为正数") Long orderId){
-        return ApiResponse.success(seckillService.payOrder(orderId));
+        SeckillOrder order = seckillService.payOrder(orderId);
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.fail(400, "订单已过期，已取消"));
+        }
+        return ResponseEntity.ok(ApiResponse.success(order));
     }
     @Operation(summary = "取消订单", description = "取消指定订单，超时未支付会自动取消并回滚库存")
     @PostMapping("/cancel/{orderId}")
