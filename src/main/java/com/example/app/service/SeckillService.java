@@ -23,6 +23,10 @@ import java.util.List;
 @Service
 public class SeckillService {
     private static final Logger log = LoggerFactory.getLogger(SeckillService.class);
+    private static final long LUA_STOCK_UNAVAILABLE = 0L;
+    private static final long LUA_SUCCESS = 1L;
+    private static final long LUA_DUPLICATE = 2L;
+    private static final long LUA_KEY_MISSING = -1L;
     private final SeckillProductRepository seckillProductRepository;
     private final StringRedisTemplate redisTemplate;
     private final SeckillOrderRepository seckillOrderRepository;
@@ -32,7 +36,7 @@ public class SeckillService {
         STOCK_SCRIPT.setScriptText(
     "local stockValue = redis.call('get', KEYS[1]) " +
     "if not stockValue then " +
-    "   return 0 " +
+    "   return -1 " +
     "end " +
     "local stock = tonumber(stockValue) " +
     "local seckill = redis.call('sismember', KEYS[2], ARGV[1]) " +
@@ -55,7 +59,7 @@ public class SeckillService {
         STOCK_SCRIPTTWO.setScriptText(
     "local stockValue = redis.call('get', KEYS[1]) " +
     "if not stockValue then " +
-    "   return 0 " +
+    "   return -1 " +
     "end " +
     "local seckill = redis.call('sismember', KEYS[2], ARGV[1]) " +
     "if seckill == 1 then " +
@@ -121,15 +125,20 @@ public class SeckillService {
             throw new SeckillException("Lua 执行异常");
         }
 
-        if (result == 2L) {
+        if (result == LUA_DUPLICATE) {
             return "你已购买";
         }
 
-        if (result == 0L) {
+        if (result == LUA_STOCK_UNAVAILABLE) {
             return "库存不够";
         }
 
-        if (result != 1L) {
+        if (result == LUA_KEY_MISSING) {
+            log.error("Redis 库存 Key 不存在，无法执行抢购，productId={}, stockKey={}, buyKey={}", productId, stockKey, buyKey);
+            throw new SeckillException("库存缓存未初始化");
+        }
+
+        if (result != LUA_SUCCESS) {
             throw new SeckillException("Lua 返回未知结果");
         }
         try{    
@@ -228,7 +237,7 @@ public class SeckillService {
                 log.warn("释放缓存资格失败回滚脚本执行失败,username={},orderId={},productId={}",username,order.getId(),productId);
                 throw new SeckillException("回滚脚本执行失败");
             }
-            if (resultTwo == 0L) {
+            if (resultTwo == LUA_KEY_MISSING) {
                 log.warn("释放缓存资格失败商品库存key不存在,username={},orderId={},productId={},",username,order.getId(),productId);
                 throw new SeckillException("回滚失败库存key不存在");
             }
@@ -261,8 +270,17 @@ public class SeckillService {
             String stockKey = "stock:" + productId;
             String buyKey = "seckill:users:" + productId;
             Long rollbackResult = rollbackStockLua(stockKey,buyKey,order.getUsername());
-            if (rollbackResult == null || rollbackResult != 1L) {
-                throw new SeckillException("取消订单失败，释放抢购资格失败");
+            if (rollbackResult == null) {
+                throw new SeckillException("取消订单失败，回滚脚本执行异常");
+            }
+            if (rollbackResult == LUA_KEY_MISSING) {
+                throw new SeckillException("取消订单失败，库存缓存不存在");
+            }
+            if (rollbackResult == LUA_DUPLICATE) {
+                throw new SeckillException("取消订单失败，用户抢购资格不存在");
+            }
+            if (rollbackResult != LUA_SUCCESS) {
+                throw new SeckillException("取消订单失败，Lua 返回未知结果");
             }
             order.setStatus(OrderStatus.CANCELLED);
             log.info("用户主动取消订单成功，orderId={}, username={}, productId={}",orderId, order.getUsername(), productId);
