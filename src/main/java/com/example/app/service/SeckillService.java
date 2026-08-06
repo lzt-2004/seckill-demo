@@ -153,8 +153,18 @@ public class SeckillService {
             return "抢到了，订单号：" + seckillOrder.getId();
         }catch(Exception exception){
             try {
-                Long rollbackResult = rollbackStockLua(stockKey,buyKey, username);
-                log.error("订单创建失败，已尝试补偿 Redis 资格，username={}, productId={}, stockKey={}, buyKey={}, rollbackResult={}", username, productId, stockKey, buyKey, rollbackResult, exception);
+                Long rollbackResult = rollbackStockLua(stockKey, buyKey, username);
+                if (rollbackResult == null) {
+                    log.error("订单创建失败，Redis 补偿未返回结果，需要人工核对，username={}, productId={}, stockKey={}, buyKey={}", username, productId, stockKey, buyKey, exception);
+                } else if (rollbackResult == LUA_SUCCESS) {
+                    log.info("订单创建失败，Redis 资格补偿成功，username={}, productId={}, stockKey={}, buyKey={}", username, productId, stockKey, buyKey, exception);
+                } else if (rollbackResult == LUA_DUPLICATE) {
+                    log.error("订单创建失败，但 Redis 中未找到用户抢购资格，无法确认是否已回补库存，username={}, productId={}, stockKey={}, buyKey={}, rollbackResult={}", username, productId, stockKey, buyKey, rollbackResult, exception);
+                } else if (rollbackResult == LUA_KEY_MISSING) {
+                    log.error("订单创建失败，Redis 库存 Key 不存在，补偿失败，username={}, productId={}, stockKey={}, buyKey={}, rollbackResult={}", username, productId, stockKey, buyKey, rollbackResult, exception);
+                } else {
+                    log.error("订单创建失败，Redis 补偿返回未知结果，需要人工核对，username={}, productId={}, stockKey={}, buyKey={}, rollbackResult={}", username, productId, stockKey, buyKey, rollbackResult, exception);
+                }
             } catch (Exception rollbackException) {
                 log.error("订单创建失败且 Redis 补偿失败，需要人工核对，username={}, productId={}, stockKey={}, buyKey={}", username, productId, stockKey, buyKey, rollbackException);
             }
